@@ -301,3 +301,122 @@ exports.resetController = (req, res) => {
     }
   }
 }
+
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT)
+exports.googleController = (req, res) => {
+  const {idToken} = req.body
+  //Get Token from request
+
+  // Verify token 
+  client
+    .verifyIdToken({idToken, audience: process.env.GOOGLE_CLIENT})
+    .then(response => {
+      const {
+        email_verified, 
+        name, 
+        email
+      } = response.payload
+
+      //Check if email verified
+      if(email_verified) {
+        User.findOne({email}).exec((err, user) => {
+          // Find if this email already exists
+          if(user) {
+            const token = jwt.sign({_id: user.id}, process.env.JWT_SECRET, {
+              expiresIn: '7d'  // valid token for 7 days
+            })
+
+            const {_id, email, name, role} = user;
+            // send response to client side(react) token and user info
+            return res.json({
+              token,
+              user:{_id, email, name, role}
+            })
+          } else {
+            // If user not exists we will save in database and generate password for it 
+            let password = email + process.env.JWT_SECRET;
+            user = new User({name, email, password}) // create user object with this email
+            user.save((err, data) => {
+              if (err) {
+                return res.status(400).json({
+                  error : errorHandler(err)
+                })
+              } 
+
+              // If no error, generate token 
+              const token = jwt.sign(
+                {_id: data._id},
+                process.env.JWT_SECRET,
+                {expiresIn: '7d'}
+              )
+              const {_id, email, name, role} = data;
+              return res.json({
+                token,
+                user: {_id, email, name, role}
+              })
+            })
+          }
+        })
+      } else {
+        // If error 
+        return res.status(400).json({
+          error: 'Google login failed, try again'
+        })
+      }
+    })
+}
+
+exports.facebookController = (req, res) => {
+  const {userID, accessToken} = req.body // Get id and token from react 
+  const url = `https://graph.facebook.com/v2.11/${userID}?fields=id,name,email&access_token=${accessToken}`;
+
+  // get from facebook 
+  return (
+    fetch(url, {
+      method: 'GET'
+    }).then(response => response.json())
+      .then(response => {
+        const { email, name } = response; // Get email and password from facebook
+        User.findOne({email}).exec((err, user) => {
+          // Check if this account with this email already exists
+          if(user) {
+            const token = jwt.sign(
+              {_id: user._id},
+              process.env.JWT_SECRET,
+              {expiresIn: '7d'}
+            ); 
+            const {_id, email, name, role} = user;
+              return res.json({
+                token,
+                user: {_id, email, name, role}
+              })
+          } else {
+            let password = email + process.env.JWT_SECRET // Generate password and save to database as new user 
+            user = new User({name, email, password})
+            user.save((err, data) => {
+              if(err) {
+                return res.status(400).json({
+                  error : 'User signup failed with facebook'
+                })
+              }
+
+
+              //if no error 
+              const token = jwt.sign({_id: data._id, }, process.env.JWT_SECRET, {expiresIn: '7d'})
+              const {_id, email, name, role} = data;
+              return res.json({
+                token,
+                user: {_id, email, name, role}
+              });
+            })
+          }
+        })
+      }).catch(error => {
+        res.json({error: 'Facebook login failed. Try later'})
+      })
+  )
+
+}
+
+
+// Let's implement in client sid 

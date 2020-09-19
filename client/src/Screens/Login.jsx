@@ -4,6 +4,8 @@ import { ToastContainer, toast } from 'react-toastify';
 import { authenticate, isAuth } from '../helpers/auth';
 import axios from 'axios';
 import {Redirect} from 'react-router-dom';
+import { GoogleLogin } from 'react-google-login';
+import  FacebookLogin  from 'react-facebook-login/dist/facebook-login-render-props';
 
 const Login = ({history}) => {
   const [formData, setFormData] = useState({
@@ -17,6 +19,53 @@ const Login = ({history}) => {
   const handleChange = text => e => {
     setFormData({...formData, [text]: e.target.value })
   }
+
+  // send facebook token 
+  const sendFacebookToken = (userID, accessToken) => {
+    axios.post(`${process.env.REACT_APP_API_URL}/facebooklogin`, {
+      userID, accessToken
+    }).then(res => {
+      console.log(res.data)
+      informParent(res)
+    }).catch(err => {
+      toast.error('Facebook Auth error');
+    })
+  }
+
+  // send google token 
+  const sendGoogleToken = tokenId => {
+    axios
+    .post(`${process.env.REACT_APP_API_URL}/googlelogin`, {
+      idToken: tokenId
+    })
+    .then(res => {
+      informParent(res)
+    })
+    .catch(err => {
+      toast.error(`google login error`)
+    })
+  }
+
+  // If success we need to authenticate user and redirect 
+  const informParent = response => {
+    authenticate(response, () => {
+      isAuth() && isAuth.role === 'admin' 
+      ? history.push('/admin') 
+      : history.push('/private')
+    })
+  };
+
+  // Get reponse from google 
+  const responseGoogle = response => {
+    sendGoogleToken(response.tokenId)
+  }
+
+  // Get response from facebook 
+  const responseFacebook = response => {
+    console.log(response)
+    sendFacebookToken(response.userID, response.accessToken);
+  }
+
 
   // Submit data to backend
   const handleSubmit = e => {
@@ -110,11 +159,52 @@ const Login = ({history}) => {
               </div>
 
               <div className='flex flex-col items-center'>
+              <GoogleLogin
+                  clientId={`${process.env.REACT_APP_GOOGLE_CLIENT}`}
+                  onSuccess={ responseGoogle }
+                  onFailure={ responseGoogle }
+                  cookiePolicy={'single_host_origin'}
+                  render={renderProps => (
+                    <button
+                    onClick={renderProps.onClick}
+                    disabled={ renderProps.disabled }
+                    className='w-full max-w-xs font-bold shadow-sm rounded-lg py-3 
+                    bg-indigo-100 text-gray-800 flex items-center justify-center transition-all 
+                    duration-300 ease-in-out focus:outline-none hover:shadow focus:shadow-sm focus:shadow-outline'
+                    >
+                      <div className=' p-2 rounded-full '>
+                        <i className='fab fa-google ' />
+                      </div>
+                      <span className='ml-4'>Sign In with Google</span>
+                    </button>
+                  )}
+                >
+                </GoogleLogin>
+                <FacebookLogin
+                  appId={`${process.env.REACT_APP_FACEBOOK_CLIENT}`}  // this facebook app id 
+                  autoLoad={false} // if true when open login page it will go to login with facebook and we won't to do this 
+                  callback={responseFacebook}
+                  render={renderProps => (
+                    <button
+                    onClick={renderProps.onClick}
+                    className='w-full max-w-xs font-bold shadow-sm rounded-lg py-3 bg-indigo-100 text-gray-800 flex items-center justify-center transition-all duration-300 ease-in-out focus:outline-none hover:shadow focus:shadow-sm focus:shadow-outline mt-5'
+                    >
+                      <div className=' p-2 rounded-full '>
+                        <i className='fab fa-facebook' />
+                      </div>
+                      <span className='ml-4'>Sign In with Facebook</span>
+                    </button>
+                  )}
+                >
+                </FacebookLogin>
+
                 <a
                 href='/register'
                 className='w-full max-w-xs font-bold shadow-sm rounded-lg py-3
                           bg-indigo-100 text-gray-800 flex items-center justify-center transition-all duration-300 ease-in-out focus:outline-none hover:shadow focus:shadow-sm focus:shadow-outline mt-5'
-                >Sign Up</a>
+                >Sign Up
+                </a>
+                
               </div>
             </form>
           </div>

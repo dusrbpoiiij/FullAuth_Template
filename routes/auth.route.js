@@ -15,7 +15,9 @@ const {
   activationController,
   loginController,
   forgetController,
-  resetController
+  resetController,
+  googleController,
+  facebookController
 } = require('../controllers/auth.controller.js')
 
 router.post('/register', validRegister, registerController);
@@ -24,5 +26,10 @@ router.post('/activation',activationController);
 router.put('/password/forget', forgotPasswordValidator, forgetController)
 router.put('/password/reset', resetPasswordValidator, resetController)
 
+// implement social login google and facebook
+// First routes 
+router.post('/googlelogin', googleController)
 
+// Now let's implement the backend 
+router.post('/facebooklogin', facebookController)
 module.exports = router;
